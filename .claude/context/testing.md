@@ -20,16 +20,26 @@
 
 ### Fixtures (`app/tests/conftest.py`)
 
-- `db` — in-memory SQLite session (overrides `get_db` dependency).
-- `client` — `TestClient` with dependency overrides applied.
-- `auth_headers` — convenience fixture that logs in and returns `Authorization` headers.
+**Database:** a real Postgres test DB, `schedulr_test`, on the same container as the dev DB
+(`postgresql+psycopg://schedulr:schedulr@localhost:5433/schedulr_test`; override with
+`TEST_DATABASE_URL`). It is **not** created by `docker compose up` — create it once with
+`docker exec schedulr-db createdb -U schedulr schedulr_test`, otherwise every test errors with
+`database "schedulr_test" does not exist`. Tables are created/dropped per test session; each
+test runs inside a nested transaction that is rolled back, so tests never see each other's data.
+
+- `db` — Postgres session wrapped in a rolled-back transaction (overrides `get_db`).
+- `client` — `TestClient` with the `db` override applied.
+- `team`, `admin_user`, `member_user`, `contact`, `meeting`, `availability_slot` — seeded model rows.
+- `admin_headers` / `member_headers` — JWT `Authorization: Bearer` headers (forward auth pattern; use these for new routes).
+- `admin_token` / `member_token` — the raw JWTs behind those headers.
+- `admin_session_headers` — legacy `X-Session-Token` header; only for routes still on `auth_legacy.py`.
 
 ### Patterns
 
 ```python
 # Route test pattern (from test_meetings.py)
-def test_create_meeting(client, auth_headers):
-    resp = client.post("/api/meetings", json={...}, headers=auth_headers)
+def test_create_meeting(client, admin_headers):
+    resp = client.post("/api/meetings", json={...}, headers=admin_headers)
     assert resp.status_code == 201
     data = resp.json()
     assert data["title"] == "..."
