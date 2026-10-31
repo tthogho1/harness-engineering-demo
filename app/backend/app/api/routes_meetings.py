@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models import Meeting, MeetingInvitee, User
 from app.schemas.meeting import MeetingCreate, MeetingUpdate, RSVPUpdate
 from app.services.auth_jwt import get_current_user
-from app.services.export_service import PDFExport
+from app.services.export_service import CSVExport, ExportService, PDFExport
 from app.services.meeting_service import list_meetings, serialize_meeting, get_meeting
 
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
@@ -73,13 +73,16 @@ def export_meetings(
     current: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Only PDF export exists today. SCH-142 adds CSV (the workshop builds it live).
-    if format != "pdf":
+    exporter: ExportService
+    if format == "pdf":
+        exporter = PDFExport()
+    elif format == "csv":
+        exporter = CSVExport()
+    else:
         raise HTTPException(status_code=400, detail=f"Unsupported export format: {format}")
     meetings = (
         db.execute(select(Meeting).where(Meeting.team_id == current.team_id)).scalars().all()
     )
-    exporter = PDFExport()
     body = exporter.render(list(meetings), viewer_tz=current.timezone)
     return Response(
         content=body,

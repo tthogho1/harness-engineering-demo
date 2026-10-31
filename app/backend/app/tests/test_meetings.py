@@ -223,6 +223,27 @@ class TestExport:
         assert resp.headers["content-type"] == "application/pdf"
 
     def test_unsupported_format(self, client: TestClient, admin_headers: dict) -> None:
-        # CSV is NOT built yet (workshop builds it live)
-        resp = client.get("/api/meetings/export?format=csv", headers=admin_headers)
+        resp = client.get("/api/meetings/export?format=xlsx", headers=admin_headers)
         assert resp.status_code == 400
+
+    def test_csv_export(self, client: TestClient, admin_headers: dict, meeting: Meeting) -> None:
+        resp = client.get("/api/meetings/export?format=csv", headers=admin_headers)
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/csv")
+        assert "meetings.csv" in resp.headers["content-disposition"]
+        body = resp.content.decode("utf-8-sig")
+        assert body.startswith("ID,Title,Host,Start,End,Timezone,Status,Invitees,Notes")
+        assert "Discovery Call" in body
+        assert "Priya Shah" in body
+
+    def test_csv_export_requires_auth(self, client: TestClient) -> None:
+        resp = client.get("/api/meetings/export?format=csv")
+        assert resp.status_code == 401
+
+    def test_csv_export_uses_viewer_timezone(
+        self, client: TestClient, member_headers: dict, meeting: Meeting
+    ) -> None:
+        # member_user is Europe/Berlin; meeting starts 14:00 UTC -> 16:00 CEST
+        resp = client.get("/api/meetings/export?format=csv", headers=member_headers)
+        assert resp.status_code == 200
+        assert "16:00" in resp.content.decode("utf-8-sig")
