@@ -7,6 +7,7 @@ import {
   fetchMeetings,
   fetchTeam,
   exportUrl,
+  downloadExport,
   type MeetingRow,
   type TeamMember,
 } from "@/lib/api";
@@ -33,6 +34,7 @@ export default function MeetingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Filter state
   const [search, setSearch] = useState("");
@@ -67,6 +69,13 @@ export default function MeetingsPage() {
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, hostId, status, startAfter, startBefore, page]);
+
+  function handleExportCsv() {
+    setExporting(true);
+    downloadExport("csv")
+      .catch(() => setError("Could not export meetings"))
+      .finally(() => setExporting(false));
+  }
 
   function handleSearch(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -134,7 +143,6 @@ export default function MeetingsPage() {
           </div>
 
           <div className="flex gap-2 ml-auto">
-            {/* Only PDF export exists today. SCH-142 adds CSV — the workshop builds it live. */}
             {/* Gated on mount: exportUrl() reads the auth token from localStorage, which is
                 absent during SSR — rendering the tokenized href before mount mismatches hydration. */}
             {mounted ? (
@@ -150,6 +158,15 @@ export default function MeetingsPage() {
                 Export PDF
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={!mounted || exporting}
+            >
+              <Download className="h-4 w-4" />
+              {exporting ? "Exporting…" : "Export CSV"}
+            </Button>
           </div>
         </div>
       </Card>

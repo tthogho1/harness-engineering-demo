@@ -196,10 +196,31 @@ export async function updateRSVP(meetingId: number, inviteeId: number, response:
   });
 }
 
-// Only PDF export exists today. SCH-142 adds CSV (the workshop builds it live).
+// Legacy: puts the JWT in a ?token= query param, which the backend's
+// OAuth2PasswordBearer does not read (Bearer header only). Prefer downloadExport().
 export function exportUrl(format: string): string {
   const token = getToken();
   return `${API_BASE}/api/meetings/export?format=${format}&token=${token}`;
+}
+
+// Download a meetings export using the Bearer header (no token in the URL).
+export async function downloadExport(format: "pdf" | "csv"): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/meetings/export?format=${format}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw Object.assign(new Error(body || res.statusText), { status: res.status });
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `meetings.${format}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ── Contacts ──────────────────────────────────────────────────────────────────
